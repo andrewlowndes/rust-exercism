@@ -1,0 +1,9 @@
+num = { "-"? ~ ('0'..'9')+ }
+plus = { " plus " ~ expr }
+minus = { " minus " ~ expr }
+multiplied = { " multiplied by " ~ expr }
+divided = { " divided by " ~ expr }
+exponent = { " raised to the " ~ (num ~ ("st"|"nd"|"rd"|"th")) ~ " power" }
+expr = { plus | minus | divided | multiplied | exponent | num }
+
+stmt = { "What is " ~ (expr)+ ~ "?" }
