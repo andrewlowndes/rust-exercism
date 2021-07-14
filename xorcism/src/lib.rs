@@ -1,22 +1,16 @@
 use std::{
     borrow::Borrow,
-    cell::RefCell,
     io::{Read, Write},
     iter::Cycle,
-    rc::Rc,
     slice::Iter,
 };
 
-pub struct Xorcism<'a> {
-    key_iter: Rc<RefCell<Cycle<Iter<'a, u8>>>>,
-}
+pub trait Captures<'a> {}
+impl<'a, T: ?Sized> Captures<'a> for T {}
 
-impl<'a> Clone for Xorcism<'a> {
-    fn clone(&self) -> Self {
-        Xorcism {
-            key_iter: Rc::new(RefCell::new((*self.key_iter).borrow().clone())),
-        }
-    }
+#[derive(Clone)]
+pub struct Xorcism<'a> {
+    key_iter: Cycle<Iter<'a, u8>>,
 }
 
 impl<'a> Xorcism<'a> {
@@ -25,26 +19,27 @@ impl<'a> Xorcism<'a> {
         Key: AsRef<[u8]> + ?Sized,
     {
         Xorcism {
-            key_iter: Rc::new(RefCell::new(key.as_ref().iter().cycle())),
+            key_iter: key.as_ref().iter().cycle(),
         }
     }
 
     pub fn munge_in_place(&mut self, data: &mut [u8]) {
-        let mut key_iter = self.key_iter.borrow_mut();
-
         data.iter_mut()
-            .for_each(move |item| *item ^= key_iter.next().unwrap())
+            .for_each(move |item| *item ^= self.key_iter.next().unwrap())
     }
 
-    pub fn munge<Data, Value>(&mut self, data: Data) -> impl Iterator<Item = u8> + 'a
+    pub fn munge<'func, 'data, Data>(
+        &'func mut self,
+        data: Data,
+    ) -> impl Iterator<Item = u8> + Captures<'a> + 'data
     where
-        Data: IntoIterator<Item = Value> + 'a,
-        Value: Borrow<u8> + 'a,
+        Data: IntoIterator + 'data,
+        Data::Item: Borrow<u8>,
+        Data::IntoIter: 'a,
+        'func: 'data,
     {
-        let key_iter = Rc::clone(&self.key_iter);
-
         data.into_iter()
-            .map(move |item| *item.borrow() ^ key_iter.borrow_mut().next().unwrap())
+            .map(move |item| *item.borrow() ^ self.key_iter.next().unwrap())
     }
 
     pub fn reader<R: Read>(self, reader: R) -> XorcismRead<'a, R> {
